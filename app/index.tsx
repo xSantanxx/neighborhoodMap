@@ -71,6 +71,8 @@ export default function Index() {
   const mapRef = useRef<MapView>(null);
   const press = useRef(false);
   const descriptionRequestId = useRef(0);
+  const hasCenteredOnUser = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
   const [selectedNeighDesc, setSelectedNeighDesc] = useState('');
   const [loadingDesc, setLoadingDesc] = useState(false);
   const [discLocation, setDiscLocation] = useState<any[]>([]);
@@ -106,18 +108,36 @@ export default function Index() {
 
   useEffect(() => {
         (async () => {
-            let {status} = await Location.requestForegroundPermissionsAsync();
-            if(status !== 'granted'){
+            const {status} = await Location.requestForegroundPermissionsAsync();
+            if (status !== "granted") {
                 return;
             }
 
-            let loc = await Location.getCurrentPositionAsync({
+            const lastKnown = await Location.getLastKnownPositionAsync();
+            if (lastKnown) {
+                setLocation(lastKnown);
+            }
+
+            const loc = await Location.getCurrentPositionAsync({
                 accuracy: Location.Accuracy.Balanced,
-                timeInterval: 5,
             });
             setLocation(loc);
         })();
     }, []);
+
+    useEffect(() => {
+        if (!location || !mapReady || hasCenteredOnUser.current) {
+            return;
+        }
+
+        hasCenteredOnUser.current = true;
+        mapRef.current?.animateToRegion({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+        }, 600);
+    }, [location, mapReady]);
 
     useEffect(() => {
         (async () => {
@@ -298,6 +318,7 @@ export default function Index() {
             <BlurView intensity={40} tint={"light"} style={styles.secondPop}><Text style={{fontWeight: "bold", fontSize: 12}}>{borough}</Text>
             <Text>{neighComplete}% Complete</Text></BlurView></TouchableOpacity></Modal>
             <MapView onPress={active} ref={mapRef} onMapReady={() => {
+                setMapReady(true);
                 mapRef.current?.setMapBoundaries(
                 { latitude: 40.9176, longitude: -73.7004 },
                 { latitude: 40.4774, longitude: -74.2591 }
